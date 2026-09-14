@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meditación, 8 semanas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+  :root {
+    --ink:#211E1A; --ink-soft:#726A5A; --paper:#EDEAE2; --card:#FFFFFF;
+    --line:#DBD6C8; --moss:#3E5240; --moss-soft:#CBD5C3; --moss-pale:#E7EBE2;
+    --dusk:#5B4B67; --dusk-soft:#EAE3EF;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; }
+  .font-serif-display { font-family: 'Fraunces', serif; }
+  @keyframes breathe { 0%, 100% { transform: scale(0.8); } 50% { transform: scale(1); } }
+  .breathing { animation: breathe 8s ease-in-out infinite; }
+  .day-btn:disabled { cursor: default; }
+  .fade-in { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .layout-wrap { display: flex; flex-direction: column; gap: 1.25rem; }
+  @media (min-width: 768px) {
+    .layout-wrap {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-areas: "plan plan" "calendar timer";
+      gap: 1.25rem;
+    }
+    .layout-wrap > .area-plan { grid-area: plan; }
+    .layout-wrap > .area-calendar { grid-area: calendar; }
+    .layout-wrap > .area-timer { grid-area: timer; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.3/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo, Fragment } = React;
+
+/* ---------- iconos (SVG propios, sin dependencias) ---------- */
+const iconProps = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
+const IconCalendar = (p) => <svg {...iconProps} {...p}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>;
+const IconTimer = (p) => <svg {...iconProps} {...p}><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>;
+const IconBook = (p) => <svg {...iconProps} {...p}><path d="M4 5c2-1 5-1 8 1v13c-3-2-6-2-8-1V5Z"/><path d="M20 5c-2-1-5-1-8 1v13c3-2 6-2 8-1V5Z"/></svg>;
+const IconFlame = (p) => <svg {...iconProps} {...p}><path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c1 1 2 2 2 4a5 5 0 0 1-10 0c0-5 5-6 5-12Z"/></svg>;
+const IconChevronDown = (p) => <svg {...iconProps} {...p}><polyline points="6 9 12 15 18 9"/></svg>;
+const IconChevronLeft = (p) => <svg {...iconProps} {...p}><polyline points="15 18 9 12 15 6"/></svg>;
+const IconChevronRight = (p) => <svg {...iconProps} {...p}><polyline points="9 18 15 12 9 6"/></svg>;
+const IconPlay = (p) => <svg {...iconProps} {...p}><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>;
+const IconPause = (p) => <svg {...iconProps} {...p}><rect x="6" y="4" width="4" height="16" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" fill="currentColor" stroke="none"/></svg>;
+const IconRotate = (p) => <svg {...iconProps} {...p}><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 7 7 7"/></svg>;
+const IconCheck = (p) => <svg {...iconProps} {...p}><polyline points="20 6 9 17 4 12"/></svg>;
+
+/* ---------- datos del plan ---------- */
+const WEEKS = [
+  { n: 1, minutes: 5, minLabel: "5 min", note: "Arrancás acá" },
+  { n: 2, minutes: 7, minLabel: "7 min", note: null },
+  { n: 3, minutes: 10, minLabel: "10 min", note: null },
+  { n: 4, minutes: 10, minLabel: "10 min", note: "Consolidás, no subís" },
+  { n: 5, minutes: 12, minLabel: "12 min", note: null },
+  { n: 6, minutes: 15, minLabel: "15 min", note: null },
+  { n: 7, minutes: 15, minLabel: "15 min", note: "Consolidás" },
+  { n: 8, minutes: 17, minLabel: "17–20 min", note: "Meta alcanzada" },
+];
+const DURATIONS = [5, 7, 10, 12, 15, 17, 20];
+const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const MONTH_LABELS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+const LEARN_SECTIONS = [
+  { title: "Por qué 8 semanas", body: "A las 8 semanas de práctica diaria, un estudio de Harvard liderado por la neurocientífica Sara Lazar mostró cambios físicos medibles en el cerebro: más materia gris en zonas de atención y regulación emocional, y menos actividad en la región asociada al estrés. Con 15 a 20 minutos por día ya alcanzás ese umbral — no hace falta más. Por eso el plan termina justo ahí." },
+  { title: "La postura", body: "Espalda recta pero no rígida — apoyado contra un respaldo está perfecto. Silla, almohadón o piso, lo que te resulte cómodo por el tiempo que dure la sesión. Manos apoyadas sobre las piernas, ojos cerrados o con la mirada baja y relajada. La idea es que el cuerpo deje de pedir atención para que la atención pueda ir a otro lado: a la respiración, entrando y saliendo por la nariz." },
+  { title: "Qué hacer cuando la mente se va", body: "Se va. Todo el tiempo, desde el primer día hasta el número mil. No es un error tuyo ni una señal de que esto no es para vos — es lo que hacen las mentes. El ejercicio entero pasa en el instante en que notás que te fuiste y volvés a la respiración. Ese regreso es la repetición, como una flexión para el bíceps de la atención: cuantas más hacés, más fuerte queda. No hay que obsesionarse con \\"hacerlo bien\\"." },
+  { title: "Errores comunes al empezar", list: [
+    "Buscar \\"dejar la mente en blanco\\": es imposible y no es el objetivo. La idea es notar los pensamientos, no eliminarlos.",
+    "Calificar la sesión como buena o mala según cuánto te distrajiste. No hay examen — te sentaste, con eso alcanza.",
+    "Esperar resultados inmediatos. Los cambios son acumulativos: se notan a las semanas, no a los cinco minutos.",
+    "Saltear el día entero cuando no llegás con el tiempo, en vez de acortar la sesión a dos minutos.",
+    "Subir los minutos antes de que el hábito esté firme. Las semanas de \\"consolidás\\" del plan están ahí a propósito.",
+  ]},
+  { title: "Preguntas frecuentes", faq: [
+    { q: "¿Qué hago si me quedo dormido?", a: "Pasa, sobre todo de noche o si estás cansado. Probá sentado en vez de acostado, o cambiá el horario a la mañana." },
+    { q: "¿Puedo meditar acostado?", a: "Sí, aunque sentado ayuda a mantenerte alerta. Si el objetivo es dormir, es otra práctica — para esta, sentado funciona mejor." },
+    { q: "¿Necesito silencio total?", a: "No. Un ambiente razonablemente tranquilo alcanza. El ruido de fondo también puede ser el ancla a la que volvés cuando la mente se dispersa." },
+    { q: "¿Sirven 2 minutos si es todo lo que tengo ese día?", a: "Sí, y mucho. La regla más importante del plan es no romper la cadena: un día corto vale más que un día saltado." },
+  ]},
+];
+
+/* ---------- utilidades ---------- */
+const STORAGE_KEY = "meditacion-entries";
+function pad(n) { return n.toString().padStart(2, "0"); }
+function toKey(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
+function formatTime(total) { const m = Math.floor(total / 60), s = total % 60; return `${pad(m)}:${pad(s)}`; }
+function loadEntries() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {}; }
+  catch (e) { return {}; }
+}
+function saveEntries(next) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) { console.error("No se pudo guardar", e); }
+}
+function playBell(ctxRef, type) {
+  try {
+    if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = ctxRef.current;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const freqs = type === "start" ? [880, 1318.5] : [659.3, 987.8, 1318.5];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine"; osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.3 / (i + 1), now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now); osc.stop(now + 2.5);
+    });
+  } catch (e) { console.error("No se pudo reproducir la campana", e); }
+}
+
+const navBtnStyle = { width: 32, height: 32, borderRadius: "0.5rem", border: "1px solid var(--line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--ink)" };
+const primaryBtnStyle = { display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.65rem 1.4rem", borderRadius: "0.6rem", border: "none", background: "var(--moss)", color: "#fff", fontWeight: 600, fontSize: "0.95rem", cursor: "pointer" };
+
+/* ---------- app ---------- */
+function App() {
+  const [entries, setEntries] = useState(loadEntries);
+  const [viewDate, setViewDate] = useState(new Date());
+  const [tab, setTab] = useState("practicar");
+  const [openLearn, setOpenLearn] = useState(0);
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [duration, setDuration] = useState(5);
+  const [secondsLeft, setSecondsLeft] = useState(5 * 60);
+  const [running, setRunning] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+
+  const intervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const durationTouchedRef = useRef(false);
+
+  const persist = useCallback((next) => { setEntries(next); saveEntries(next); }, []);
+  const todayKey = toKey(new Date());
+
+  const toggleDay = (key) => {
+    if (key > todayKey) return;
+    const next = { ...entries };
+    if (next[key]) delete next[key]; else next[key] = true;
+    persist(next);
+  };
+  const markToday = useCallback(() => {
+    setEntries((prev) => {
+      if (prev[todayKey]) return prev;
+      const next = { ...prev, [todayKey]: true };
+      saveEntries(next);
+      return next;
+    });
+  }, [todayKey]);
+
+  const sortedKeys = useMemo(() => Object.keys(entries).sort(), [entries]);
+  const totalCount = sortedKeys.length;
+  const progressPct = Math.min(100, Math.round((totalCount / 56) * 100));
+
+  const streak = useMemo(() => {
+    let count = 0; const cursor = new Date();
+    if (!entries[toKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
+    while (entries[toKey(cursor)]) { count++; cursor.setDate(cursor.getDate() - 1); }
+    return count;
+  }, [entries]);
+
+  const weekProgress = useMemo(() => {
+    const buckets = Array(8).fill(0);
+    sortedKeys.forEach((_, i) => { const w = Math.floor(i / 7); if (w < 8) buckets[w]++; });
+    return buckets;
+  }, [sortedKeys]);
+
+  const currentWeekIdx = useMemo(() => { const idx = weekProgress.findIndex((c) => c < 7); return idx === -1 ? 7 : idx; }, [weekProgress]);
+  const activeWeekIdx = selectedWeek !== null ? selectedWeek : currentWeekIdx;
+
+  useEffect(() => {
+    if (durationTouchedRef.current) return;
+    const rec = WEEKS[currentWeekIdx].minutes;
+    setDuration(rec); setSecondsLeft(rec * 60);
+  }, [currentWeekIdx]);
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setSecondsLeft((s) => {
+          if (s <= 1) {
+            clearInterval(intervalRef.current); setRunning(false);
+            playBell(audioCtxRef, "end"); markToday(); setJustCompleted(true);
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [running, markToday]);
+
+  const startTimer = () => { playBell(audioCtxRef, "start"); setJustCompleted(false); setRunning(true); };
+  const pauseTimer = () => setRunning(false);
+  const resetTimer = () => { setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
+  const selectDuration = (m) => { durationTouchedRef.current = true; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
+  const resetProgress = () => { if (window.confirm("¿Borrar todo el progreso guardado? No se puede deshacer.")) persist({}); };
+
+  const year = viewDate.getFullYear(), month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const changeMonth = (delta) => setViewDate(new Date(year, month + delta, 1));
+
+  const activeWeek = WEEKS[activeWeekIdx];
+  const isFullyDone = totalCount >= 56;
+
+  return (
+    <div style={{ background: "var(--paper)", color: "var(--ink)", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1.25rem 4rem" }}>
+        <header style={{ marginBottom: "1.75rem" }}>
+          <h1 className="font-serif-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>Meditación, 8 semanas</h1>
+          <p style={{ color: "var(--ink-soft)", marginTop: "0.4rem", fontSize: "1rem" }}>Todos los días le gana a mucho rato una vez por semana.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "center", marginTop: "1.25rem", paddingTop: "1.1rem", borderTop: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <IconFlame color={streak > 0 ? "var(--dusk)" : "var(--ink-soft)"} />
+              <span style={{ fontSize: "0.9rem" }}>
+                <strong className="font-serif-display" style={{ fontWeight: 600 }}>{streak}</strong>{" "}
+                <span style={{ color: "var(--ink-soft)" }}>{streak === 1 ? "día seguido" : "días seguidos"}</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flex: "1 1 200px", minWidth: 180 }}>
+              <span style={{ fontSize: "0.9rem", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>Plan {progressPct}%</span>
+              <div style={{ flex: 1, height: 6, background: "var(--line)", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ width: `${progressPct}%`, height: "100%", background: "var(--moss)", borderRadius: 999, transition: "width 0.4s ease" }} />
+              </div>
+            </div>
+            <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>{totalCount} de 56 sesiones</span>
+          </div>
+        </header>
+
+        <nav style={{ display: "flex", gap: "1.5rem", borderBottom: "1px solid var(--line)", marginBottom: "1.75rem" }}>
+          {[{ id: "practicar", label: "Practicar", Icon: IconTimer }, { id: "aprender", label: "Aprender a meditar", Icon: IconBook }].map(({ id, label, Icon }) => (
+            <button key={id} onClick={() => setTab(id)} style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", borderBottom: tab === id ? "2px solid var(--moss)" : "2px solid transparent", color: tab === id ? "var(--ink)" : "var(--ink-soft)", fontWeight: tab === id ? 600 : 500, fontSize: "0.95rem", padding: "0.6rem 0.1rem", cursor: "pointer", marginBottom: "-1px" }}>
+              <Icon /> {label}
+            </button>
+          ))}
+        </nav>
+
+        {tab === "practicar" && (
+          <div className="fade-in">
+            <div className="layout-wrap">
+              <section className="area-calendar" style={{ background: "var(--card)", borderRadius: "1.25rem", border: "1px solid var(--line)", padding: "1.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.1rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <IconCalendar color="var(--moss)" />
+                    <h2 className="font-serif-display" style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0, textTransform: "capitalize" }}>{MONTH_LABELS[month]} {year}</h2>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.25rem" }}>
+                    <button onClick={() => changeMonth(-1)} aria-label="Mes anterior" style={navBtnStyle}><IconChevronLeft /></button>
+                    <button onClick={() => changeMonth(1)} aria-label="Mes siguiente" style={navBtnStyle}><IconChevronRight /></button>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "0.4rem", marginBottom: "0.4rem" }}>
+                  {DAY_LABELS.map((d) => <div key={d} style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--ink-soft)", fontWeight: 500 }}>{d}</div>)}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "0.4rem" }}>
+                  {cells.map((d, i) => {
+                    if (d === null) return <div key={`b${i}`} />;
+                    const key = `${year}-${pad(month + 1)}-${pad(d)}`;
+                    const done = !!entries[key], isToday = key === todayKey, isFuture = key > todayKey;
+                    return (
+                      <button key={key} className="day-btn" disabled={isFuture} onClick={() => toggleDay(key)} aria-label={`${d} de ${MONTH_LABELS[month]}${done ? ", meditado" : ""}`}
+                        style={{ aspectRatio: "1", borderRadius: "0.6rem", border: isToday && !done ? "1.5px solid var(--dusk)" : "1px solid transparent", background: done ? "var(--moss)" : "transparent", color: done ? "#fff" : isFuture ? "var(--line)" : "var(--ink)", fontWeight: isToday ? 700 : 500, fontSize: "0.85rem", cursor: isFuture ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {done ? <IconCheck width={16} height={16} /> : d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={resetProgress} style={{ marginTop: "1.25rem", background: "none", border: "none", color: "var(--ink-soft)", fontSize: "0.8rem", textDecoration: "underline", cursor: "pointer", padding: 0 }}>Borrar progreso guardado</button>
+              </section>
+
+              <section className="area-timer" style={{ background: "var(--card)", borderRadius: "1.25rem", border: "1px solid var(--line)", padding: "1.5rem", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", alignSelf: "flex-start", marginBottom: "1.25rem" }}>
+                  <IconTimer color="var(--moss)" />
+                  <h2 className="font-serif-display" style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0 }}>Temporizador</h2>
+                </div>
+                <div className={running ? "breathing" : ""} style={{ width: 168, height: 168, borderRadius: "50%", background: "var(--moss-pale)", border: "1px solid var(--moss-soft)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1.5rem" }}>
+                  <span className="font-serif-display" style={{ fontSize: "2.1rem", fontWeight: 500 }}>{formatTime(secondsLeft)}</span>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", justifyContent: "center", marginBottom: "0.6rem" }}>
+                  {DURATIONS.map((m) => (
+                    <button key={m} onClick={() => selectDuration(m)} style={{ padding: "0.4rem 0.75rem", borderRadius: "0.5rem", border: "1px solid var(--line)", background: duration === m ? "var(--moss)" : "transparent", color: duration === m ? "#fff" : "var(--ink)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>{m}m</button>
+                  ))}
+                </div>
+                <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: 0, marginBottom: "1.5rem" }}>Recomendado para la semana {activeWeekIdx + 1}: {WEEKS[currentWeekIdx].minLabel}</p>
+                <div style={{ display: "flex", gap: "0.6rem" }}>
+                  {!running ? <button onClick={startTimer} style={primaryBtnStyle}><IconPlay width={16} height={16} /> Iniciar</button>
+                    : <button onClick={pauseTimer} style={primaryBtnStyle}><IconPause width={16} height={16} /> Pausar</button>}
+                  <button onClick={resetTimer} aria-label="Reiniciar temporizador" style={navBtnStyle}><IconRotate /></button>
+                </div>
+                {justCompleted && <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--moss)", fontWeight: 500 }}>Sesión de hoy registrada en el calendario ✓</p>}
+                {!justCompleted && !entries[todayKey] && <button onClick={markToday} style={{ marginTop: "1rem", background: "none", border: "none", color: "var(--ink-soft)", fontSize: "0.8rem", textDecoration: "underline", cursor: "pointer", padding: 0 }}>Ya medité hoy sin el timer, marcar igual</button>}
+                {!justCompleted && entries[todayKey] && <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "var(--ink-soft)" }}>Hoy ya está registrado ✓</p>}
+              </section>
+
+              <section className="area-plan" style={{ background: "var(--card)", borderRadius: "1.25rem", border: "1px solid var(--line)", padding: "1.5rem" }}>
+              <h2 className="font-serif-display" style={{ fontSize: "1.1rem", fontWeight: 600, margin: "0 0 1.25rem" }}>Plan de 8 semanas</h2>
+              <div style={{ display: "flex", alignItems: "center", overflowX: "auto", paddingBottom: "0.4rem" }}>
+                {WEEKS.map((w, i) => {
+                  const done = weekProgress[i], full = done >= 7, isCurrent = i === currentWeekIdx, isSelected = i === activeWeekIdx;
+                  return (
+                    <Fragment key={w.n}>
+                      {i > 0 && <div style={{ flex: 1, minWidth: 10, height: 1, background: "var(--line)" }} />}
+                      <button onClick={() => setSelectedWeek(i)} style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem", background: "none", border: "none", cursor: "pointer" }} aria-label={`Semana ${w.n}, ${done} de 7 días`}>
+                        <div className="font-serif-display" style={{ width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: "0.95rem", background: full ? "var(--moss)" : done > 0 ? "var(--moss-soft)" : "#fff", color: full ? "#fff" : "var(--ink)", border: isSelected ? "2px solid var(--dusk)" : "1px solid var(--line)" }}>{w.n}</div>
+                        {isCurrent && <span style={{ fontSize: "0.65rem", color: "var(--dusk)", fontWeight: 500 }}>ahora</span>}
+                      </button>
+                    </Fragment>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: "1.25rem", paddingTop: "1.1rem", borderTop: "1px solid var(--line)", display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: "0.5rem" }}>
+                <div>
+                  <span className="font-serif-display" style={{ fontWeight: 600, fontSize: "1.05rem" }}>Semana {activeWeek.n}</span>
+                  {activeWeek.note && <span style={{ color: "var(--dusk)", fontSize: "0.85rem", marginLeft: "0.6rem" }}>{activeWeek.note}</span>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <span style={{ fontSize: "0.9rem", color: "var(--ink-soft)" }}>{weekProgress[activeWeekIdx]}/7 días</span>
+                  <span className="font-serif-display" style={{ fontWeight: 600, fontSize: "1.05rem" }}>{activeWeek.minLabel}/día</span>
+                </div>
+              </div>
+              {isFullyDone && <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "var(--moss)" }}>Completaste las 8 semanas. El hábito ya está armado — seguí sosteniéndolo.</p>}
+              </section>
+            </div>
+          </div>
+        )}
+
+        {tab === "aprender" && (
+          <div className="fade-in">
+            <p style={{ color: "var(--ink-soft)", marginBottom: "1.5rem", maxWidth: 640 }}>Antes de la práctica, un poco de contexto: por qué funciona, cómo sentarte y qué hacer con la mente que no para.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              {LEARN_SECTIONS.map((section, i) => {
+                const isOpen = openLearn === i;
+                return (
+                  <div key={section.title} style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: "1rem", overflow: "hidden" }}>
+                    <button onClick={() => setOpenLearn(isOpen ? null : i)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", padding: "1.1rem 1.4rem", cursor: "pointer", textAlign: "left" }}>
+                      <span className="font-serif-display" style={{ fontSize: "1.05rem", fontWeight: 600 }}>{section.title}</span>
+                      <IconChevronDown color="var(--ink-soft)" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
+                    </button>
+                    {isOpen && (
+                      <div style={{ padding: "0 1.4rem 1.4rem", color: "var(--ink-soft)", fontSize: "0.95rem", lineHeight: 1.65 }}>
+                        {section.body && <p style={{ margin: 0, maxWidth: 640 }}>{section.body}</p>}
+                        {section.list && <ul style={{ margin: 0, paddingLeft: "1.1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>{section.list.map((item, j) => <li key={j}>{item}</li>)}</ul>}
+                        {section.faq && <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>{section.faq.map((f, j) => (
+                          <div key={j}>
+                            <p style={{ margin: "0 0 0.2rem", color: "var(--ink)", fontWeight: 600, fontSize: "0.9rem" }}>{f.q}</p>
+                            <p style={{ margin: 0, maxWidth: 600 }}>{f.a}</p>
+                          </div>
+                        ))}</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
