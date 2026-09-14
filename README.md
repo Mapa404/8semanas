@@ -2,86 +2,86 @@
 
 # Meditación, 8 semanas
 
-Una app minimalista para armar el hábito de meditar todos los días: calendario de seguimiento, temporizador con campana, un plan progresivo de 8 semanas y una guía para aprender a meditar.
+A minimalist app for building a daily meditation habit: a tracking calendar, a timer with a bell, a progressive 8-week plan, and a short guide on how to meditate.
 
-**Demo en vivo:** [8semanas.vercel.app](https://8semanas.vercel.app)
+**Live demo:** [8semanas.vercel.app](https://8semanas.vercel.app)
 
-No tiene backend, no tiene base de datos, no tiene build. Es un único archivo `index.html` que corre en cualquier navegador y guarda el progreso en `localStorage`.
+No backend, no database, no build step. It's a single `index.html` file that runs in any browser and saves progress to `localStorage`.
 
 ---
 
-## Qué hace
+## What it does
 
-- **Calendario mensual** donde cada día se marca solo o a mano, con navegación entre meses.
-- **Temporizador** con presets de 5 a 20 minutos, campana de inicio y cierre (sintetizada con Web Audio, sin archivos de audio), y una animación de círculo que "respira" mientras corre la sesión.
-- **Plan de 8 semanas** que sube de a poco los minutos diarios y se detiene dos semanas para consolidar el hábito antes del próximo salto. El plan no es estático: la app calcula sola en qué semana estás según cuántos días completaste, y arranca cada sesión con la duración recomendada.
-- **Racha de días seguidos**, para reforzar la idea central del método: todos los días le gana a mucho rato una vez por semana.
-- **Guía "Aprender a meditar"**: postura, qué hacer cuando la mente se dispersa, errores comunes al empezar y preguntas frecuentes.
-- Sin cuenta, sin login, sin tracking. Todo vive en el navegador de quien la usa.
+- **Monthly calendar** where each day gets marked automatically or by hand, with navigation between months.
+- **Timer** with presets from 5 to 20 minutes, a start/end bell synthesized with the Web Audio API (no audio files involved), and a breathing-circle animation while a session runs.
+- **8-week plan** that ramps up daily minutes gradually and holds for a week here and there to let the habit settle before the next jump. The plan isn't static: the app figures out which week you're on based on how many days you've actually completed, and starts each session at the recommended duration for that week.
+- **Streak counter**, reinforcing the method's core idea: every day beats one long session a week.
+- **"Learn to meditate" guide**: posture, what to do when your mind wanders, common beginner mistakes, and FAQ.
+- No account, no login, no tracking. Everything lives in the user's own browser.
 
-## Cómo se hizo
+## How it was built
 
-El punto de partida fue **Google AI Studio** (Gemini): ahí armé la primera versión como un proyecto React + TypeScript + Vite, con el calendario y el plan como dos bloques separados. Cuando se acabaron los tokens de esa sesión, me pasé a **Claude** para rediseñarla de cero y sumarle lo que faltaba: el temporizador con campana, la barra de progreso real (calculada sobre las sesiones guardadas, no sobre la fecha del calendario), la racha, y la guía de meditación.
+This started in **Google AI Studio** (Gemini): that's where I built the first version as a React + TypeScript + Vite project, with the calendar and the plan as two separate blocks. When that session ran out of tokens, I moved to **Claude** to redesign it from scratch and add what was missing — the timer with the bell, a real progress bar (calculated from saved sessions, not from the calendar date), the streak, and the meditation guide.
 
-La decisión más importante fue técnica: en vez de mantener el proyecto Vite original, lo convertí a **un solo archivo HTML sin paso de build**. La razón es simple — quería poder subir esto a GitHub Pages o Vercel arrastrando un archivo, sin `npm install`, sin pipeline, sin que un cambio de versión de una dependencia rompa el deploy dentro de dos años. React, ReactDOM y Babel Standalone se cargan por CDN, y Babel transpila el JSX directo en el navegador al cargar la página.
+The most consequential decision was technical: instead of keeping the original Vite project, I converted it into **a single HTML file with no build step**. The reasoning was simple — I wanted to be able to drop this onto GitHub Pages or Vercel by dragging one file in, with no `npm install`, no pipeline, and no risk of a dependency bump quietly breaking the deploy two years from now. React, ReactDOM, and Babel Standalone load from a CDN, and Babel transpiles the JSX in the browser at page load.
 
-El contenido de "Aprender a meditar" lo escribí después de revisar varias guías de meditación para principiantes (Mayo Clinic, Insight Timer, entre otras) para asegurarme de que la técnica y los errores comunes que describo son los que realmente se repiten en la literatura sobre el tema — pero está redactado de cero, no copiado de ninguna fuente.
+The "Learn to meditate" content was written after reviewing several beginner meditation guides (Mayo Clinic, Insight Timer, among others) to make sure the technique and common mistakes described actually match what shows up consistently in that literature — but it's written from scratch, not copied from any source.
 
-## Stack técnico
+## Tech stack
 
-- **React 18** (build UMD, vía CDN) — sin JSX precompilado
-- **Babel Standalone** — transpila el JSX en el navegador al cargar la página
-- **Web Audio API** — genera la campana de inicio/cierre con osciladores, no hay archivos `.mp3`
-- **`localStorage`** — persistencia del progreso, por navegador
-- **CSS variables + estilos inline** — sin Tailwind ni ningún framework de CSS
-- **Google Fonts** — Fraunces (serif, para títulos y números) + Inter (sans, para el resto)
-- Cero dependencias de `npm`, cero paso de build
+- **React 18** (UMD build, via CDN) — no precompiled JSX
+- **Babel Standalone** — transpiles JSX in the browser at page load
+- **Web Audio API** — generates the start/end bell with oscillators, no `.mp3` files
+- **`localStorage`** — progress persistence, per browser
+- **CSS variables + inline styles** — no Tailwind, no CSS framework
+- **Google Fonts** — Fraunces (serif, for headings and numbers) + Inter (sans, for everything else)
+- Zero `npm` dependencies, zero build step
 
-## Decisiones de diseño
+## Design decisions
 
-Quise evitar la estética genérica de "SaaS con IA" (fondo crema + acento terracota, o tarjetas idénticas con el mismo border-radius en todo). La paleta terminó siendo papel + musgo + un violeta apagado para los estados "actuales", pensada para que se sienta más cuaderno de hábitos que dashboard.
+I wanted to avoid the generic "AI-generated SaaS" look — cream background plus terracotta accent, or identical cards with the same border-radius on everything. The palette ended up being paper + moss green + a muted violet for "current" states, meant to feel more like a habit journal than a dashboard.
 
-Dos decisiones puntuales:
+Two specific choices worth calling out:
 
-- El **plan de 8 semanas se visualiza como un sendero de piedras** (círculos numerados conectados por una línea) en vez de una lista de tarjetas — la metáfora del camino le queda mejor a un hábito que se construye semana a semana que una tabla de datos.
-- El **temporizador es un círculo que respira** (se expande y contrae cada 8 segundos mientras corre) en lugar de solo mostrar el número — un gesto chico, pero que conecta la interfaz con lo que estás haciendo mientras la mirás.
+- The **8-week plan is shown as a stepping-stone path** (numbered circles connected by a line) instead of a list of cards — the path metaphor fits a habit that gets built week by week better than a data table would.
+- The **timer is a circle that breathes** (expanding and contracting on an 8-second cycle while it runs) instead of just showing a number — a small touch, but one that ties the interface to what you're actually doing while looking at it.
 
-## Estructura del proyecto
+## Project structure
 
 ```
-├── index.html              App completa: HTML, CSS y JS en un solo archivo
-├── og-image.png             Imagen para la vista previa al compartir el link
-├── apple-touch-icon.png     Ícono para agregar el sitio a la pantalla de inicio en iOS
+├── index.html              The whole app: HTML, CSS, and JS in one file
+├── og-image.png             Preview image shown when the link is shared
+├── apple-touch-icon.png     Icon for adding the site to an iOS home screen
 └── README.md
 ```
 
-## Correr o publicar esto
+## Running or deploying this
 
-No hace falta build ni `npm install`. Alcanza con abrir `index.html` en un navegador para probarlo local.
+No build, no `npm install`. Just open `index.html` in a browser to try it locally.
 
-Para publicarlo:
+To publish it:
 
 **GitHub Pages**
-1. Subí los tres archivos (`index.html`, `og-image.png`, `apple-touch-icon.png`) a la raíz del repo.
-2. `Settings → Pages → Source`, elegí la rama `main` y la carpeta `/root`.
-3. GitHub te da una URL en uno o dos minutos.
+1. Push all three files (`index.html`, `og-image.png`, `apple-touch-icon.png`) to the root of the repo.
+2. `Settings → Pages → Source`, pick the `main` branch and the `/root` folder.
+3. GitHub gives you a URL within a minute or two.
 
 **Vercel**
-Importá el repo tal cual — al no tener `package.json`, Vercel lo sirve como sitio estático sin ningún paso extra.
+Import the repo as-is — with no `package.json`, Vercel serves it as a static site with no extra configuration.
 
-Si el dominio cambia, hay que actualizar tres líneas en el `<head>` de `index.html`: `<link rel="canonical">`, `<meta property="og:url">` y `<meta property="og:image">` — hoy apuntan a `https://8semanas.vercel.app`.
+If the domain ever changes, three lines in `index.html`'s `<head>` need updating: `<link rel="canonical">`, `<meta property="og:url">`, and `<meta property="og:image">` — they currently point to `https://8semanas.vercel.app`.
 
-## Ideas para sumar
+## Ideas for later
 
-- Exportar/importar el progreso como JSON, para no perderlo si se cambia de navegador
-- Modo oscuro
-- Notificación diaria (vía Service Worker) para no depender de acordarse solo
+- Export/import progress as JSON, so it survives a browser switch
+- Dark mode
+- A daily reminder (via Service Worker) instead of relying on memory alone
 
-## Licencia
+## License
 
-MIT — usalo, forkealo, rompelo, lo que quieras.
+MIT — use it, fork it, break it, whatever you want.
 
-## Autor
+## Author
 
-Hecho por **[Mapa Bianchi](https://www.linkedin.com/in/mapabianchi/)** — vibecoding.
-Más proyectos en [mapabianchi.online](https://mapabianchi.online).
+Built by **[Mapa Bianchi](https://www.linkedin.com/in/mapabianchi/)** — vibecoding.
+More projects at [mapabianchi.online](https://mapabianchi.online).
