@@ -155,6 +155,7 @@ function App() {
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
   const durationTouchedRef = useRef(false);
+  const endTimeRef = useRef(null);
 
   const persist = useCallback((next) => { setEntries(next); saveEntries(next); }, []);
   const todayKey = toKey(new Date());
@@ -245,26 +246,49 @@ function App() {
     setDuration(rec); setSecondsLeft(rec * 60);
   }, [currentWeekIdx]);
 
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft((s) => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current); setRunning(false);
-            playBell(audioCtxRef, "end"); markToday(); setJustCompleted(true);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [running, markToday]);
+  // Marca el momento exacto en que la sesión debe terminar. El intervalo solo
+  // refresca el número en pantalla; el tiempo real se calcula siempre contra
+  // el reloj del sistema, así el temporizador no se desincroniza aunque el
+  // navegador ralentice o pause el intervalo en segundo plano.
+  const finishSession = useCallback(() => {
+    clearInterval(intervalRef.current);
+    endTimeRef.current = null;
+    setRunning(false);
+    setSecondsLeft(0);
+    playBell(audioCtxRef, "end");
+    markToday();
+    setJustCompleted(true);
+  }, [markToday]);
 
-  const startTimer = () => { playBell(audioCtxRef, "start"); setJustCompleted(false); setRunning(true); };
-  const pauseTimer = () => setRunning(false);
-  const resetTimer = () => { setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
-  const selectDuration = (m) => { durationTouchedRef.current = true; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
+  const tick = useCallback(() => {
+    if (endTimeRef.current == null) return;
+    const remaining = Math.round((endTimeRef.current - Date.now()) / 1000);
+    if (remaining <= 0) { finishSession(); }
+    else { setSecondsLeft(remaining); }
+  }, [finishSession]);
+
+  useEffect(() => {
+    if (!running) return;
+    intervalRef.current = setInterval(tick, 250);
+    return () => clearInterval(intervalRef.current);
+  }, [running, tick]);
+
+  // Al volver a la pestaña, recalcular de inmediato contra el reloj real.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible" && running) tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [running, tick]);
+
+  const startTimer = () => {
+    playBell(audioCtxRef, "start");
+    setJustCompleted(false);
+    endTimeRef.current = Date.now() + secondsLeft * 1000;
+    setRunning(true);
+  };
+  const pauseTimer = () => { endTimeRef.current = null; setRunning(false); };
+  const resetTimer = () => { endTimeRef.current = null; setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
+  const selectDuration = (m) => { durationTouchedRef.current = true; endTimeRef.current = null; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
   const resetProgress = () => {
     if (!window.confirm("¿Borrar todo el progreso guardado? No se puede deshacer.")) return;
     persist({});
