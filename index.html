@@ -79,6 +79,7 @@ const IconPlay = (p) => <svg {...iconProps} {...p}><polygon points="6 4 20 12 6 
 const IconPause = (p) => <svg {...iconProps} {...p}><rect x="6" y="4" width="4" height="16" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" fill="currentColor" stroke="none"/></svg>;
 const IconRotate = (p) => <svg {...iconProps} {...p}><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 7 7 7"/></svg>;
 const IconCheck = (p) => <svg {...iconProps} {...p}><polyline points="20 6 9 17 4 12"/></svg>;
+const IconX = (p) => <svg {...iconProps} {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
 /* ---------- datos del plan ---------- */
 const WEEKS = [
@@ -159,14 +160,19 @@ function App() {
   const [secondsLeft, setSecondsLeft] = useState(5 * 60);
   const [running, setRunning] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [showModal, setShowModal] = useState(() => !localStorage.getItem("meditacion-modal-accepted"));
 
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
   const durationTouchedRef = useRef(false);
-  const endTimeRef = useRef(null);
 
   const persist = useCallback((next) => { setEntries(next); saveEntries(next); }, []);
   const todayKey = toKey(new Date());
+
+  const acceptModal = () => {
+    localStorage.setItem("meditacion-modal-accepted", "true");
+    setShowModal(false);
+  };
 
   const toggleDay = (key) => {
     if (key > todayKey) return;
@@ -209,49 +215,26 @@ function App() {
     setDuration(rec); setSecondsLeft(rec * 60);
   }, [currentWeekIdx]);
 
-  // Marca el momento exacto en que la sesión debe terminar. El intervalo solo
-  // refresca el número en pantalla; el tiempo real se calcula siempre contra
-  // el reloj del sistema, así el temporizador no se desincroniza aunque el
-  // navegador ralentice o pause el intervalo en segundo plano.
-  const finishSession = useCallback(() => {
-    clearInterval(intervalRef.current);
-    endTimeRef.current = null;
-    setRunning(false);
-    setSecondsLeft(0);
-    playBell(audioCtxRef, "end");
-    markToday();
-    setJustCompleted(true);
-  }, [markToday]);
-
-  const tick = useCallback(() => {
-    if (endTimeRef.current == null) return;
-    const remaining = Math.round((endTimeRef.current - Date.now()) / 1000);
-    if (remaining <= 0) { finishSession(); }
-    else { setSecondsLeft(remaining); }
-  }, [finishSession]);
-
   useEffect(() => {
-    if (!running) return;
-    intervalRef.current = setInterval(tick, 250);
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setSecondsLeft((s) => {
+          if (s <= 1) {
+            clearInterval(intervalRef.current); setRunning(false);
+            playBell(audioCtxRef, "end"); markToday(); setJustCompleted(true);
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    }
     return () => clearInterval(intervalRef.current);
-  }, [running, tick]);
+  }, [running, markToday]);
 
-  // Al volver a la pestaña, recalcular de inmediato contra el reloj real.
-  useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === "visible" && running) tick(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [running, tick]);
-
-  const startTimer = () => {
-    playBell(audioCtxRef, "start");
-    setJustCompleted(false);
-    endTimeRef.current = Date.now() + secondsLeft * 1000;
-    setRunning(true);
-  };
-  const pauseTimer = () => { endTimeRef.current = null; setRunning(false); };
-  const resetTimer = () => { endTimeRef.current = null; setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
-  const selectDuration = (m) => { durationTouchedRef.current = true; endTimeRef.current = null; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
+  const startTimer = () => { playBell(audioCtxRef, "start"); setJustCompleted(false); setRunning(true); };
+  const pauseTimer = () => setRunning(false);
+  const resetTimer = () => { setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
+  const selectDuration = (m) => { durationTouchedRef.current = true; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
   const resetProgress = () => { if (window.confirm("¿Borrar todo el progreso guardado? No se puede deshacer.")) persist({}); };
 
   const year = viewDate.getFullYear(), month = viewDate.getMonth();
@@ -267,6 +250,37 @@ function App() {
 
   return (
     <div style={{ background: "var(--paper)", color: "var(--ink)", minHeight: "100vh" }}>
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div className="fade-in" style={{ background: "#0F0F0F", color: "#F0F0F0", padding: "2rem", borderRadius: "1.25rem", maxWidth: 420, width: "100%", border: "1px solid #333", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+            <h2 className="font-serif-display" style={{ fontSize: "1.6rem", fontWeight: 700, margin: "0 0 1.5rem", color: "#FFF" }}>Lo que decidí no hacer</h2>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "0", borderTop: "1px solid #2A2A2A", borderBottom: "1px solid #2A2A2A", padding: "0.5rem 0", marginBottom: "1.5rem" }}>
+              {[
+                "Cuentas, logins y perfiles",
+                "Rachas que te retan si fallás",
+                "Notificaciones para volver",
+                "Backend y base de datos",
+                "Suscripción y paywall",
+                "Biblioteca de 300 sonidos"
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.8rem", padding: "0.75rem 0", borderBottom: i < 5 ? "1px solid #2A2A2A" : "none" }}>
+                  <IconX width={16} height={16} color="#777" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: "0.95rem", color: "#CCC" }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            
+            <p style={{ fontSize: "0.9rem", color: "#AAA", lineHeight: 1.5, marginBottom: "2rem" }}>
+              Lo que no está también es una decisión: cada función que saqué es una fricción menos entre abrir la app y sentarme a meditar. <strong>Todo queda alojado acá en tu navegador, para vos.</strong>
+            </p>
+            
+            <button onClick={acceptModal} style={{ width: "100%", padding: "0.9rem", borderRadius: "0.6rem", border: "none", background: "#FFF", color: "#000", fontWeight: 600, fontSize: "1rem", cursor: "pointer" }}>
+              Entendido, acepto
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1.25rem 4rem" }}>
         <header style={{ marginBottom: "1.75rem" }}>
           <h1 className="font-serif-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>Meditación, 8 semanas</h1>
