@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Meditación en 8 semanas · Aprendé a meditar de cero</title>
 
-<meta name="description" content="Aprendé a meditar de cero con un plan de 8 semanas: guía, temporizador y seguimiento diario. En 8 semanas de práctica, el cerebro cambia de verdad." />
+<meta name="description" content="Aprendé a meditar de cero con un plan de 8 semanas: guía, temporizador y seguimiento diario para volver la meditación un hábito." />
 <link rel="canonical" href="https://8semanas.vercel.app/" />
 <meta name="robots" content="index, follow" />
 <meta name="theme-color" content="#3E5240" />
@@ -16,7 +16,7 @@
 <meta property="og:type" content="website" />
 <meta property="og:locale" content="es_AR" />
 <meta property="og:title" content="Meditación en 8 semanas" />
-<meta property="og:description" content="Aprendé a meditar de cero con un plan de 8 semanas. En 8 semanas de práctica, el cerebro cambia de verdad." />
+<meta property="og:description" content="Aprendé a meditar de cero con un plan de 8 semanas para volver la meditación un hábito." />
 <meta property="og:url" content="https://8semanas.vercel.app/" />
 <meta property="og:image" content="https://8semanas.vercel.app/og-image.png" />
 <meta property="og:image:width" content="1200" />
@@ -25,7 +25,7 @@
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Meditación en 8 semanas" />
-<meta name="twitter:description" content="Aprendé a meditar de cero con un plan de 8 semanas. En 8 semanas de práctica, el cerebro cambia de verdad." />
+<meta name="twitter:description" content="Aprendé a meditar de cero con un plan de 8 semanas para volver la meditación un hábito." />
 <meta name="twitter:image" content="https://8semanas.vercel.app/og-image.png" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
@@ -97,7 +97,7 @@ const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTH_LABELS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
 const LEARN_SECTIONS = [
-  { title: "Por qué 8 semanas", body: "A las 8 semanas de práctica diaria, un estudio de Harvard liderado por la neurocientífica Sara Lazar mostró cambios físicos medibles en el cerebro: más materia gris en zonas de atención y regulación emocional, y menos actividad en la región asociada al estrés. Con 15 a 20 minutos por día ya alcanzás ese umbral — no hace falta más. Por eso el plan termina justo ahí." },
+  { title: "Por qué 8 semanas", body: "El número no es casual, y tiene una historia. Un estudio de Harvard bastante famoso sugirió que a las 8 semanas de meditar aparecían cambios físicos en el cerebro, en zonas ligadas a la memoria y al estrés. Con el tiempo, estudios más grandes pusieron en duda esa parte —el cambio en el cerebro hoy está en discusión— pero las 8 semanas quedaron como una referencia útil por otro motivo: es el tiempo que lleva que meditar deje de ser una tarea que te acordás de hacer y pase a ser parte del día, como lavarte los dientes. Ocho semanas también suena corto, y ese es medio el truco: es un número que invita a empezar sin sentir que te anotás a algo enorme. El plan no te pide sesiones largas, te pide constancia. Las 8 semanas son la excusa para arrancar; el hábito es lo que te queda." },
   { title: "La postura", body: "Espalda recta pero no rígida — apoyado contra un respaldo está perfecto. Silla, almohadón o piso, lo que te resulte cómodo por el tiempo que dure la sesión. Manos apoyadas sobre las piernas, ojos cerrados o con la mirada baja y relajada. La idea es que el cuerpo deje de pedir atención para que la atención pueda ir a otro lado: a la respiración, entrando y saliendo por la nariz." },
   { title: "Qué hacer cuando la mente se va", body: "Se va. Todo el tiempo, desde el primer día hasta el número mil. No es un error tuyo ni una señal de que esto no es para vos — es lo que hacen las mentes. El ejercicio entero pasa en el instante en que notás que te fuiste y volvés a la respiración. Ese regreso es la repetición, como una flexión para el bíceps de la atención: cuantas más hacés, más fuerte queda. No hay que obsesionarse con \"hacerlo bien\"." },
   { title: "Errores comunes al empezar", list: [
@@ -113,6 +113,7 @@ const LEARN_SECTIONS = [
     { q: "¿Necesito silencio total?", a: "No. Un ambiente razonablemente tranquilo alcanza. El ruido de fondo también puede ser el ancla a la que volvés cuando la mente se dispersa." },
     { q: "¿Sirven 2 minutos si es todo lo que tengo ese día?", a: "Sí, y mucho. La regla más importante del plan es no romper la cadena: un día corto vale más que un día saltado." },
   ]},
+  { title: "Qué dice la ciencia", body: "La meditación es de las prácticas más estudiadas, y hay beneficios que aparecen una y otra vez en la investigación: menos estrés y ansiedad, mejor calidad de sueño, más capacidad de concentración, y una forma más pareja de reaccionar ante lo que molesta. También hay evidencia de que ayuda a bajar la presión arterial y a acompañar el manejo del dolor crónico y del ánimo. Lo interesante es que estos efectos —los que se sienten en el día a día— aparecen cuando la práctica se sostiene en el tiempo, no en una sesión suelta: es la constancia la que hace la diferencia, no la sesión perfecta. Una aclaración importante: meditar suma, pero no reemplaza a la atención médica o psicológica. Si estás pasando un momento difícil, buscá también acompañamiento profesional." },
 ];
 
 /* ---------- utilidades ---------- */
@@ -308,8 +309,8 @@ function App() {
       )}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1.25rem 4rem" }}>
         <header style={{ marginBottom: "1.75rem" }}>
-          <h1 className="font-serif-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>8 semanas para cambiar tu cerebro</h1>
-          <p style={{ color: "var(--ink-soft)", marginTop: "0.4rem", fontSize: "1rem" }}>Meditá con práctica diaria: el cambio es real y medible. Empezá de cero, con una guía y un plan para sostenerlo.</p>
+          <h1 className="font-serif-display" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 600, margin: 0, lineHeight: 1.1 }}>8 semanas para sentirte distinto</h1>
+          <p style={{ color: "var(--ink-soft)", marginTop: "0.4rem", fontSize: "1rem" }}>Meditá con práctica diaria: en 8 semanas el hábito ya está armado y el cambio se siente. Empezá de cero, con una guía y un plan para sostenerlo.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "center", marginTop: "1.25rem", paddingTop: "1.1rem", borderTop: "1px solid var(--line)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
               <IconFlame color={streak > 0 ? "var(--dusk)" : "var(--ink-soft)"} />
