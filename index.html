@@ -84,15 +84,15 @@ const IconX = (p) => <svg {...iconProps} {...p}><line x1="18" y1="6" x2="6" y2="
 /* ---------- datos del plan ---------- */
 const WEEKS = [
   { n: 1, minutes: 5, minLabel: "5 min", note: "Arrancás acá" },
-  { n: 2, minutes: 7, minLabel: "7 min", note: null },
-  { n: 3, minutes: 10, minLabel: "10 min", note: null },
-  { n: 4, minutes: 10, minLabel: "10 min", note: "Consolidás, no subís" },
-  { n: 5, minutes: 12, minLabel: "12 min", note: null },
+  { n: 2, minutes: 5, minLabel: "5 min", note: "Consolidás" },
+  { n: 3, minutes: 7, minLabel: "7 min", note: null },
+  { n: 4, minutes: 10, minLabel: "10 min", note: null },
+  { n: 5, minutes: 10, minLabel: "10 min", note: "Consolidás, no subís" },
   { n: 6, minutes: 15, minLabel: "15 min", note: null },
   { n: 7, minutes: 15, minLabel: "15 min", note: "Consolidás" },
-  { n: 8, minutes: 17, minLabel: "17–20 min", note: "Meta alcanzada" },
+  { n: 8, minutes: 20, minLabel: "20 min", note: "Meta alcanzada" },
 ];
-const DURATIONS = [5, 7, 10, 12, 15, 17, 20];
+const DURATIONS = [5, 7, 10, 15, 20, 30];
 const DAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTH_LABELS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
@@ -165,6 +165,7 @@ function App() {
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
   const durationTouchedRef = useRef(false);
+  const endTimeRef = useRef(null);
 
   const persist = useCallback((next) => { setEntries(next); saveEntries(next); }, []);
   const todayKey = toKey(new Date());
@@ -215,26 +216,49 @@ function App() {
     setDuration(rec); setSecondsLeft(rec * 60);
   }, [currentWeekIdx]);
 
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft((s) => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current); setRunning(false);
-            playBell(audioCtxRef, "end"); markToday(); setJustCompleted(true);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [running, markToday]);
+  // Marca el momento exacto en que la sesión debe terminar. El intervalo solo
+  // refresca el número en pantalla; el tiempo real se calcula siempre contra
+  // el reloj del sistema, así el temporizador no se desincroniza aunque el
+  // navegador ralentice o pause el intervalo en segundo plano.
+  const finishSession = useCallback(() => {
+    clearInterval(intervalRef.current);
+    endTimeRef.current = null;
+    setRunning(false);
+    setSecondsLeft(0);
+    playBell(audioCtxRef, "end");
+    markToday();
+    setJustCompleted(true);
+  }, [markToday]);
 
-  const startTimer = () => { playBell(audioCtxRef, "start"); setJustCompleted(false); setRunning(true); };
-  const pauseTimer = () => setRunning(false);
-  const resetTimer = () => { setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
-  const selectDuration = (m) => { durationTouchedRef.current = true; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
+  const tick = useCallback(() => {
+    if (endTimeRef.current == null) return;
+    const remaining = Math.round((endTimeRef.current - Date.now()) / 1000);
+    if (remaining <= 0) { finishSession(); }
+    else { setSecondsLeft(remaining); }
+  }, [finishSession]);
+
+  useEffect(() => {
+    if (!running) return;
+    intervalRef.current = setInterval(tick, 250);
+    return () => clearInterval(intervalRef.current);
+  }, [running, tick]);
+
+  // Al volver a la pestaña, recalcular de inmediato contra el reloj real.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible" && running) tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [running, tick]);
+
+  const startTimer = () => {
+    playBell(audioCtxRef, "start");
+    setJustCompleted(false);
+    endTimeRef.current = Date.now() + secondsLeft * 1000;
+    setRunning(true);
+  };
+  const pauseTimer = () => { endTimeRef.current = null; setRunning(false); };
+  const resetTimer = () => { endTimeRef.current = null; setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
+  const selectDuration = (m) => { durationTouchedRef.current = true; endTimeRef.current = null; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
   const resetProgress = () => { if (window.confirm("¿Borrar todo el progreso guardado? No se puede deshacer.")) persist({}); };
 
   const year = viewDate.getFullYear(), month = viewDate.getMonth();
@@ -357,7 +381,7 @@ function App() {
                     <button key={m} onClick={() => selectDuration(m)} style={{ padding: "0.4rem 0.75rem", borderRadius: "0.5rem", border: "1px solid var(--line)", background: duration === m ? "var(--moss)" : "transparent", color: duration === m ? "#fff" : "var(--ink)", fontSize: "0.85rem", fontWeight: 500, cursor: "pointer" }}>{m}m</button>
                   ))}
                 </div>
-                <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: 0, marginBottom: "1.5rem" }}>Recomendado para la semana {activeWeekIdx + 1}: {WEEKS[currentWeekIdx].minLabel}</p>
+                <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", marginTop: 0, marginBottom: "1.5rem" }}>Recomendado para la semana {currentWeekIdx + 1}: {WEEKS[currentWeekIdx].minLabel}</p>
                 <div style={{ display: "flex", gap: "0.6rem" }}>
                   {!running ? <button onClick={startTimer} style={primaryBtnStyle}><IconPlay width={16} height={16} /> Iniciar</button>
                     : <button onClick={pauseTimer} style={primaryBtnStyle}><IconPause width={16} height={16} /> Pausar</button>}
