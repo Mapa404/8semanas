@@ -42,6 +42,62 @@
   .day-btn:disabled { cursor: default; }
   .fade-in { animation: fadeIn 0.25s ease; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .sound-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.48rem 0.65rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .sound-chip:hover {
+    border-color: var(--moss-soft);
+    background: var(--moss-pale);
+  }
+  .sound-chip.active {
+    border-color: var(--moss);
+    background: var(--moss-pale);
+    color: var(--moss);
+    font-weight: 600;
+  }
+  .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+    outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--moss);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--moss);
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
   .layout-wrap { display: flex; flex-direction: column; gap: 1.25rem; }
   @media (min-width: 768px) {
     .layout-wrap {
@@ -49,10 +105,11 @@
       grid-template-columns: 1.1fr 0.9fr;
       grid-template-areas: "plan plan" "calendar timer";
       gap: 1.25rem;
+      align-items: start;
     }
     .layout-wrap > .area-plan { grid-area: plan; }
-    .layout-wrap > .area-calendar { grid-area: calendar; }
-    .layout-wrap > .area-timer { grid-area: timer; }
+    .layout-wrap > .area-calendar { grid-area: calendar; align-self: start; }
+    .layout-wrap > .area-timer { grid-area: timer; align-self: start; }
   }
 </style>
 </head>
@@ -80,6 +137,12 @@ const IconPause = (p) => <svg {...iconProps} {...p}><rect x="6" y="4" width="4" 
 const IconRotate = (p) => <svg {...iconProps} {...p}><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 7 7 7"/></svg>;
 const IconCheck = (p) => <svg {...iconProps} {...p}><polyline points="20 6 9 17 4 12"/></svg>;
 const IconX = (p) => <svg {...iconProps} {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const IconBell = (p) => <svg {...iconProps} {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
+const IconVolume = (p) => <svg {...iconProps} {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>;
+const IconVolumeMute = (p) => <svg {...iconProps} {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>;
+const IconRain = (p) => <svg {...iconProps} {...p}><path d="M16 13v6m-4-8v6m-4-4v6M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>;
+const IconWaves = (p) => <svg {...iconProps} {...p}><path d="M2 12c2.5-3 5-3 7.5 0s5 3 7.5 0 5-3 7-0.5M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0 5-3 7-0.5"/></svg>;
+const IconBowl = (p) => <svg {...iconProps} {...p}><path d="M3 11c0 5 4 9 9 9s9-4 9-9H3Z"/><line x1="2" y1="11" x2="22" y2="11"/></svg>;
 
 /* ---------- datos del plan ---------- */
 const WEEKS = [
@@ -128,23 +191,322 @@ function loadEntries() {
 function saveEntries(next) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (e) { console.error("No se pudo guardar", e); }
 }
-function playBell(ctxRef, type) {
+/* ---------- sistema de audio para meditación ---------- */
+const AMBIENT_OPTIONS = [
+  { id: "none", label: "Silencio", Icon: IconVolumeMute },
+  { id: "lluvia", label: "Lluvia suave", Icon: IconRain },
+  { id: "olas", label: "Olas del mar", Icon: IconWaves },
+  { id: "cuenco", label: "Cuenco zen", Icon: IconBowl },
+];
+
+const BELL_TYPES = [
+  { id: "campana", label: "Campana tibetana", desc: "Tono agudo y cristalino" },
+  { id: "gong", label: "Gong profundo", desc: "Resonancia baja y cálida" },
+];
+
+const BELL_INTERVAL_OPTIONS = [
+  { id: "0", label: "Sin intervalo", hint: "Sonará solo al iniciar y al terminar" },
+  { id: "60", label: "1 min", hint: "Sonará cada 1 minuto para volver a la respiración" },
+  { id: "120", label: "2 min", hint: "Sonará cada 2 minutos para reconectar con el momento" },
+  { id: "180", label: "3 min", hint: "Sonará cada 3 minutos como ancla de atención" },
+  { id: "300", label: "5 min", hint: "Sonará cada 5 minutos como referencia" },
+  { id: "half", label: "A la mitad", hint: "Sonará a mitad exacta de la sesión" },
+];
+
+function getAudioContext(ctxRef) {
   try {
     if (!ctxRef.current) ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = ctxRef.current;
     if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-    const freqs = type === "start" ? [880, 1318.5] : [659.3, 987.8, 1318.5];
-    freqs.forEach((f, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = "sine"; osc.frequency.value = f;
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.3 / (i + 1), now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now); osc.stop(now + 2.5);
+    return ctx;
+  } catch (e) {
+    console.error("No se pudo iniciar AudioContext", e);
+    return null;
+  }
+}
+
+function playBellSound(ctxRef, type = "campana", variant = "single") {
+  const c = getAudioContext(ctxRef);
+  if (!c) return;
+  const now = c.currentTime;
+
+  if (type === "campana") {
+    // Campana tibetana / Tingsha: cristalina, armónicos brillantes y batido acústico suave
+    const partials = [
+      { f: 784, g: 0.35, d: 3.2 },
+      { f: 786.5, g: 0.35, d: 3.2 },
+      { f: 1568, g: 0.18, d: 2.4 },
+      { f: 2164, g: 0.12, d: 1.8 },
+      { f: 3136, g: 0.08, d: 1.2 }
+    ];
+    const count = variant === "end" ? 3 : 1;
+    for (let stroke = 0; stroke < count; stroke++) {
+      const t = now + stroke * 1.8;
+      partials.forEach(({ f, g, d }) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(g, t + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        osc.connect(gain).connect(c.destination);
+        osc.start(t);
+        osc.stop(t + d + 0.1);
+      });
+    }
+  } else {
+    // Gong tibetano: golpe sordo con mazo acolchado y larga resonancia grave
+    const partials = [
+      { f: 98, g: 0.5, d: 5.5 },
+      { f: 99.4, g: 0.45, d: 5.0 },
+      { f: 147, g: 0.3, d: 4.5 },
+      { f: 228, g: 0.22, d: 3.8 },
+      { f: 312, g: 0.15, d: 3.0 },
+      { f: 440, g: 0.09, d: 2.2 }
+    ];
+    const count = variant === "end" ? 2 : 1;
+    for (let stroke = 0; stroke < count; stroke++) {
+      const t = now + stroke * 2.8;
+
+      const bufSize = Math.floor(c.sampleRate * 0.06);
+      const noiseBuf = c.createBuffer(1, bufSize, c.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = c.createBufferSource();
+      noise.buffer = noiseBuf;
+      const nFilter = c.createBiquadFilter();
+      nFilter.type = "lowpass";
+      nFilter.frequency.setValueAtTime(180, t);
+      const nGain = c.createGain();
+      nGain.gain.setValueAtTime(0.25, t);
+      nGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      noise.connect(nFilter).connect(nGain).connect(c.destination);
+      noise.start(t);
+
+      partials.forEach(({ f, g, d }) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(g, t + 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        osc.connect(gain).connect(c.destination);
+        osc.start(t);
+        osc.stop(t + d + 0.1);
+      });
+    }
+  }
+}
+
+function createPinkNoiseBuffer(c, durationSec = 6) {
+  const size = c.sampleRate * durationSec;
+  const buffer = c.createBuffer(2, size, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const out = buffer.getChannelData(ch);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < size; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.0168980;
+      out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.05;
+      b6 = w * 0.115926;
+    }
+  }
+  return buffer;
+}
+
+function stopAmbientSound(ambientStateRef, fadeDuration = 0.6) {
+  if (!ambientStateRef.current) return;
+  const { masterGain, cleanup } = ambientStateRef.current;
+  if (masterGain) {
+    try {
+      const c = masterGain.context;
+      const now = c.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
+    } catch (e) {}
+  }
+  setTimeout(() => {
+    try { if (cleanup) cleanup(); } catch (e) {}
+  }, (fadeDuration + 0.1) * 1000);
+  ambientStateRef.current = null;
+}
+
+function setAmbientVolume(ambientStateRef, vol) {
+  if (ambientStateRef.current && ambientStateRef.current.masterGain) {
+    try {
+      const mg = ambientStateRef.current.masterGain;
+      mg.gain.setTargetAtTime(vol, mg.context.currentTime, 0.05);
+    } catch (e) {}
+  }
+}
+
+function startAmbientSound(ctxRef, ambientStateRef, soundType, volume = 0.5) {
+  stopAmbientSound(ambientStateRef, 0.25);
+  if (!soundType || soundType === "none") return;
+
+  const c = getAudioContext(ctxRef);
+  if (!c) return;
+  const now = c.currentTime;
+  const masterGain = c.createGain();
+  masterGain.gain.setValueAtTime(0.0001, now);
+  masterGain.gain.linearRampToValueAtTime(volume, now + 1.0);
+  masterGain.connect(c.destination);
+
+  const nodes = [];
+  const timers = [];
+
+  if (soundType === "lluvia") {
+    const pBuffer = createPinkNoiseBuffer(c, 6);
+    const source = c.createBufferSource();
+    source.buffer = pBuffer;
+    source.loop = true;
+
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(1100, now);
+
+    const hp = c.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.setValueAtTime(140, now);
+
+    const lfo = c.createOscillator();
+    lfo.frequency.setValueAtTime(0.08, now);
+    const lfoGain = c.createGain();
+    lfoGain.gain.setValueAtTime(0.08, now);
+    lfo.connect(lfoGain);
+
+    const rainGain = c.createGain();
+    rainGain.gain.setValueAtTime(0.7, now);
+    lfoGain.connect(rainGain.gain);
+
+    source.connect(hp).connect(lp).connect(rainGain).connect(masterGain);
+    source.start(now);
+    lfo.start(now);
+    nodes.push(source, lfo);
+
+    let dropActive = true;
+    const scheduleDrop = () => {
+      if (!dropActive) return;
+      const dTime = c.currentTime;
+      const osc = c.createOscillator();
+      const dGain = c.createGain();
+      const dFilter = c.createBiquadFilter();
+      dFilter.type = "bandpass";
+      dFilter.frequency.setValueAtTime(1400 + Math.random() * 800, dTime);
+      dFilter.Q.setValueAtTime(4, dTime);
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1200 + Math.random() * 600, dTime);
+      osc.frequency.exponentialRampToValueAtTime(600, dTime + 0.04);
+
+      dGain.gain.setValueAtTime(0.0001, dTime);
+      dGain.gain.linearRampToValueAtTime(0.04, dTime + 0.005);
+      dGain.gain.exponentialRampToValueAtTime(0.0001, dTime + 0.045);
+
+      osc.connect(dFilter).connect(dGain).connect(masterGain);
+      osc.start(dTime);
+      osc.stop(dTime + 0.05);
+
+      const nextDelay = 250 + Math.random() * 600;
+      const tid = setTimeout(scheduleDrop, nextDelay);
+      timers.push(tid);
+    };
+    scheduleDrop();
+
+    ambientStateRef.current = {
+      masterGain,
+      soundType,
+      cleanup: () => {
+        dropActive = false;
+        timers.forEach(clearTimeout);
+        nodes.forEach((n) => { try { n.stop(); n.disconnect(); } catch (e) {} });
+      }
+    };
+  } else if (soundType === "olas") {
+    const pBuffer = createPinkNoiseBuffer(c, 8);
+    const source = c.createBufferSource();
+    source.buffer = pBuffer;
+    source.loop = true;
+
+    const filter = c.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(320, now);
+
+    const waveGain = c.createGain();
+    waveGain.gain.setValueAtTime(0.15, now);
+
+    const waveLfo = c.createOscillator();
+    waveLfo.type = "sine";
+    waveLfo.frequency.setValueAtTime(0.09, now);
+
+    const filterLfoGain = c.createGain();
+    filterLfoGain.gain.setValueAtTime(300, now);
+    waveLfo.connect(filterLfoGain);
+    filterLfoGain.connect(filter.frequency);
+
+    const ampLfoGain = c.createGain();
+    ampLfoGain.gain.setValueAtTime(0.35, now);
+    waveLfo.connect(ampLfoGain);
+    ampLfoGain.connect(waveGain.gain);
+
+    source.connect(filter).connect(waveGain).connect(masterGain);
+    source.start(now);
+    waveLfo.start(now);
+    nodes.push(source, waveLfo);
+
+    ambientStateRef.current = {
+      masterGain,
+      soundType,
+      cleanup: () => {
+        nodes.forEach((n) => { try { n.stop(); n.disconnect(); } catch (e) {} });
+      }
+    };
+  } else if (soundType === "cuenco") {
+    const tones = [
+      { f: 136.1, g: 0.35 },
+      { f: 136.6, g: 0.35 },
+      { f: 272.2, g: 0.22 },
+      { f: 408.3, g: 0.14 },
+      { f: 544.4, g: 0.08 }
+    ];
+
+    tones.forEach(({ f, g }) => {
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f, now);
+
+      const tremolo = c.createOscillator();
+      tremolo.frequency.setValueAtTime(0.12 + Math.random() * 0.08, now);
+      const tGain = c.createGain();
+      tGain.gain.setValueAtTime(g * 0.2, now);
+      tremolo.connect(tGain);
+
+      gain.gain.setValueAtTime(g, now);
+      tGain.connect(gain.gain);
+
+      osc.connect(gain).connect(masterGain);
+      osc.start(now);
+      tremolo.start(now);
+      nodes.push(osc, tremolo);
     });
-  } catch (e) { console.error("No se pudo reproducir la campana", e); }
+
+    ambientStateRef.current = {
+      masterGain,
+      soundType,
+      cleanup: () => {
+        nodes.forEach((n) => { try { n.stop(); n.disconnect(); } catch (e) {} });
+      }
+    };
+  }
 }
 
 const navBtnStyle = { width: 32, height: 32, borderRadius: "0.5rem", border: "1px solid var(--line)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--ink)" };
@@ -163,8 +525,17 @@ function App() {
   const [justCompleted, setJustCompleted] = useState(false);
   const [showModal, setShowModal] = useState(() => !localStorage.getItem("meditacion-modal-accepted"));
 
+  // Configuración de audio y sonidos para meditar
+  const [ambientSound, setAmbientSound] = useState(() => localStorage.getItem("meditacion-ambient-sound") || "none");
+  const [ambientVolume, setAmbientVolumeState] = useState(() => parseFloat(localStorage.getItem("meditacion-ambient-vol") || "0.5"));
+  const [bellType, setBellType] = useState(() => localStorage.getItem("meditacion-bell-type") || "campana");
+  const [bellInterval, setBellInterval] = useState(() => localStorage.getItem("meditacion-bell-interval") || "0");
+  const [isPreviewingAmbient, setIsPreviewingAmbient] = useState(false);
+
   const intervalRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const ambientStateRef = useRef(null);
+  const lastTriggeredIntervalRef = useRef(0);
   const durationTouchedRef = useRef(false);
   const endTimeRef = useRef(null);
 
@@ -217,26 +588,48 @@ function App() {
     setDuration(rec); setSecondsLeft(rec * 60);
   }, [currentWeekIdx]);
 
-  // Marca el momento exacto en que la sesión debe terminar. El intervalo solo
-  // refresca el número en pantalla; el tiempo real se calcula siempre contra
-  // el reloj del sistema, así el temporizador no se desincroniza aunque el
-  // navegador ralentice o pause el intervalo en segundo plano.
+  // Marca el momento exacto en que la sesión debe terminar.
   const finishSession = useCallback(() => {
     clearInterval(intervalRef.current);
     endTimeRef.current = null;
     setRunning(false);
     setSecondsLeft(0);
-    playBell(audioCtxRef, "end");
+    stopAmbientSound(ambientStateRef, 0.8);
+    playBellSound(audioCtxRef, bellType, "end");
     markToday();
     setJustCompleted(true);
-  }, [markToday]);
+  }, [markToday, bellType]);
 
   const tick = useCallback(() => {
     if (endTimeRef.current == null) return;
     const remaining = Math.round((endTimeRef.current - Date.now()) / 1000);
-    if (remaining <= 0) { finishSession(); }
-    else { setSecondsLeft(remaining); }
-  }, [finishSession]);
+    if (remaining <= 0) {
+      finishSession();
+    } else {
+      setSecondsLeft(remaining);
+
+      // Verificación del intervalo para sonar campana o gong
+      const totalSec = duration * 60;
+      const elapsed = totalSec - remaining;
+
+      if (bellInterval === "half") {
+        const halfSec = Math.floor(totalSec / 2);
+        if (elapsed >= halfSec && lastTriggeredIntervalRef.current < 1 && remaining > 5) {
+          lastTriggeredIntervalRef.current = 1;
+          playBellSound(audioCtxRef, bellType, "single");
+        }
+      } else if (bellInterval !== "0") {
+        const step = parseInt(bellInterval, 10);
+        if (step > 0) {
+          const idx = Math.floor(elapsed / step);
+          if (idx > 0 && idx > lastTriggeredIntervalRef.current && remaining > 5) {
+            lastTriggeredIntervalRef.current = idx;
+            playBellSound(audioCtxRef, bellType, "single");
+          }
+        }
+      }
+    }
+  }, [finishSession, duration, bellInterval, bellType]);
 
   useEffect(() => {
     if (!running) return;
@@ -251,15 +644,101 @@ function App() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [running, tick]);
 
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      stopAmbientSound(ambientStateRef, 0.1);
+    };
+  }, []);
+
   const startTimer = () => {
-    playBell(audioCtxRef, "start");
+    if (isPreviewingAmbient) {
+      setIsPreviewingAmbient(false);
+    }
+    const isBeginning = secondsLeft === duration * 60;
+    if (isBeginning) {
+      lastTriggeredIntervalRef.current = 0;
+      playBellSound(audioCtxRef, bellType, "single");
+    }
+    if (ambientSound !== "none") {
+      startAmbientSound(audioCtxRef, ambientStateRef, ambientSound, ambientVolume);
+    }
     setJustCompleted(false);
     endTimeRef.current = Date.now() + secondsLeft * 1000;
     setRunning(true);
   };
-  const pauseTimer = () => { endTimeRef.current = null; setRunning(false); };
-  const resetTimer = () => { endTimeRef.current = null; setRunning(false); setSecondsLeft(duration * 60); setJustCompleted(false); };
-  const selectDuration = (m) => { durationTouchedRef.current = true; endTimeRef.current = null; setDuration(m); setSecondsLeft(m * 60); setRunning(false); setJustCompleted(false); };
+
+  const pauseTimer = () => {
+    endTimeRef.current = null;
+    setRunning(false);
+    stopAmbientSound(ambientStateRef, 0.4);
+  };
+
+  const resetTimer = () => {
+    endTimeRef.current = null;
+    setRunning(false);
+    setSecondsLeft(duration * 60);
+    setJustCompleted(false);
+    lastTriggeredIntervalRef.current = 0;
+    stopAmbientSound(ambientStateRef, 0.4);
+    setIsPreviewingAmbient(false);
+  };
+
+  const selectDuration = (m) => {
+    durationTouchedRef.current = true;
+    endTimeRef.current = null;
+    setDuration(m);
+    setSecondsLeft(m * 60);
+    setRunning(false);
+    setJustCompleted(false);
+    lastTriggeredIntervalRef.current = 0;
+    stopAmbientSound(ambientStateRef, 0.4);
+    setIsPreviewingAmbient(false);
+  };
+
+  const handleSelectAmbient = (soundId) => {
+    setAmbientSound(soundId);
+    localStorage.setItem("meditacion-ambient-sound", soundId);
+    if (running) {
+      startAmbientSound(audioCtxRef, ambientStateRef, soundId, ambientVolume);
+    } else if (isPreviewingAmbient) {
+      if (soundId === "none") {
+        stopAmbientSound(ambientStateRef, 0.3);
+        setIsPreviewingAmbient(false);
+      } else {
+        startAmbientSound(audioCtxRef, ambientStateRef, soundId, ambientVolume);
+      }
+    }
+  };
+
+  const handleVolumeChange = (vol) => {
+    setAmbientVolumeState(vol);
+    localStorage.setItem("meditacion-ambient-vol", vol.toString());
+    setAmbientVolume(ambientStateRef, vol);
+  };
+
+  const togglePreviewAmbient = () => {
+    if (isPreviewingAmbient) {
+      stopAmbientSound(ambientStateRef, 0.4);
+      setIsPreviewingAmbient(false);
+    } else {
+      if (ambientSound !== "none") {
+        startAmbientSound(audioCtxRef, ambientStateRef, ambientSound, ambientVolume);
+        setIsPreviewingAmbient(true);
+      }
+    }
+  };
+
+  const handleSelectBellType = (typeId) => {
+    setBellType(typeId);
+    localStorage.setItem("meditacion-bell-type", typeId);
+    playBellSound(audioCtxRef, typeId, "single");
+  };
+
+  const handleSelectBellInterval = (intervalId) => {
+    setBellInterval(intervalId);
+    localStorage.setItem("meditacion-bell-interval", intervalId);
+  };
   const resetProgress = () => { if (window.confirm("¿Borrar todo el progreso guardado? No se puede deshacer.")) persist({}); };
 
   const year = viewDate.getFullYear(), month = viewDate.getMonth();
@@ -389,6 +868,96 @@ function App() {
                     : <button onClick={pauseTimer} style={primaryBtnStyle}><IconPause width={16} height={16} /> Pausar</button>}
                   <button onClick={resetTimer} aria-label="Reiniciar temporizador" style={navBtnStyle}><IconRotate /></button>
                 </div>
+
+                {/* Separador */}
+                <div style={{ width: "100%", height: 1, background: "var(--line)", margin: "1.35rem 0 1.15rem" }} />
+
+                {/* Sección de Campana / Gong */}
+                <div style={{ width: "100%", textAlign: "left" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <IconBell width={15} height={15} color="var(--moss)" />
+                        <span style={{ fontSize: "0.86rem", fontWeight: 600, color: "var(--ink)" }}>Campana o Gong</span>
+                      </div>
+                      <button
+                        onClick={() => playBellSound(audioCtxRef, bellType, "single")}
+                        title="Probar toque"
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--moss)",
+                          fontSize: "0.78rem",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          padding: "0.2rem 0.4rem",
+                          borderRadius: "0.4rem",
+                        }}
+                      >
+                        <IconVolume width={12} height={12} /> Probar toque
+                      </button>
+                    </div>
+
+                    {/* Selector de Instrumento: Campana vs Gong */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.75rem" }}>
+                      {BELL_TYPES.map((b) => {
+                        const active = bellType === b.id;
+                        return (
+                          <button
+                            key={b.id}
+                            className={`sound-chip ${active ? "active" : ""}`}
+                            onClick={() => handleSelectBellType(b.id)}
+                            style={{ justifyContent: "center" }}
+                            type="button"
+                          >
+                            <span style={{ fontWeight: active ? 600 : 500 }}>{b.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Selector de Frecuencia / Intervalo */}
+                    <div style={{ marginBottom: "0.35rem" }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", display: "block", marginBottom: "0.35rem" }}>
+                        Sonar durante la sesión:
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                        {BELL_INTERVAL_OPTIONS.map((opt) => {
+                          const active = bellInterval === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleSelectBellInterval(opt.id)}
+                              type="button"
+                              style={{
+                                padding: "0.32rem 0.6rem",
+                                borderRadius: "0.5rem",
+                                border: active ? "1px solid var(--moss)" : "1px solid var(--line)",
+                                background: active ? "var(--moss)" : "#fff",
+                                color: active ? "#fff" : "var(--ink)",
+                                fontSize: "0.78rem",
+                                fontWeight: active ? 600 : 500,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: "0.74rem", color: "var(--ink-soft)", margin: "0.4rem 0 0", fontStyle: "italic", lineHeight: 1.35 }}>
+                      {BELL_INTERVAL_OPTIONS.find((o) => o.id === bellInterval)?.hint}
+                    </p>
+                  </div>
+                </div>
+
                 {justCompleted && <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: "var(--moss)", fontWeight: 500 }}>Sesión de hoy registrada en el calendario ✓</p>}
                 {!justCompleted && !entries[todayKey] && <button onClick={markToday} style={{ marginTop: "1rem", background: "none", border: "none", color: "var(--ink-soft)", fontSize: "0.8rem", textDecoration: "underline", cursor: "pointer", padding: 0 }}>Ya medité hoy sin el timer, marcar igual</button>}
                 {!justCompleted && entries[todayKey] && <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "var(--ink-soft)" }}>Hoy ya está registrado ✓</p>}
